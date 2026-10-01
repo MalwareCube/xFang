@@ -1,6 +1,8 @@
 (() => {
   'use strict';
 
+  if (globalThis.xFangApply) return;
+
   function deepActiveElement() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
@@ -39,29 +41,6 @@
     if (Fang.hasDefanged(text)) return 'refang';
     return null;
   }
-
-  let lastReported;
-  function report(force) {
-    const info = getEditableSelection();
-    const text = info ? info.text : '';
-    const mode = chooseMode(text);
-    if (!force && mode === lastReported) return;
-    lastReported = mode;
-    try {
-      chrome.runtime.sendMessage({ type: 'selection', mode }).catch(() => {});
-    } catch {}
-  }
-
-  let timer = 0;
-  function reportSoon() {
-    clearTimeout(timer);
-    timer = setTimeout(() => report(false), 30);
-  }
-
-  document.addEventListener('selectionchange', reportSoon);
-  document.addEventListener('mouseup', reportSoon, true);
-  document.addEventListener('keyup', reportSoon, true);
-  document.addEventListener('contextmenu', () => report(true), true);
 
   function fireInput(el) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -131,9 +110,8 @@
     }
   }
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type !== 'apply') return;
-    if (msg.requireFocus && !document.hasFocus()) return;
+  globalThis.xFangApply = (requireFocus) => {
+    if (requireFocus && !document.hasFocus()) return;
     const info = getEditableSelection();
     if (!info) return;
     const mode = chooseMode(info.text);
@@ -144,6 +122,5 @@
 
     if (info.kind === 'field') replaceInField(info, newText);
     else replaceInRich(info, newText, transform);
-    report(true);
-  });
+  };
 })();
